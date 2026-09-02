@@ -7,11 +7,6 @@ jobs:
   build:
     runs-on: ubuntu-24.04
 
-    strategy:
-      fail-fast: false
-      matrix:
-        target: [c2s, c2slte, c1s, c1slte, z3s, y2s, y2slte, x1s, x1slte, r8s]
-
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
@@ -40,12 +35,20 @@ jobs:
       - name: Make build script executable
         run: chmod +x build.sh
 
-      - name: Build kernel (${{ matrix.target }})
+      - name: Verify z3s USB Mass Storage config
         run: |
-          ./build.sh -m ${{ matrix.target }} -k y -r n
+          make O=out ARCH=arm64 exynos9830_defconfig z3s.config
+          echo "=== USB MASS STORAGE CONFIG ==="
+          grep -E '^CONFIG_USB_CONFIGFS_MASS_STORAGE=|^CONFIG_USB_F_MASS_STORAGE=' out/.config
+          test "$(grep -E '^CONFIG_USB_CONFIGFS_MASS_STORAGE=y$' out/.config)"
+          test "$(grep -E '^CONFIG_USB_F_MASS_STORAGE=y$' out/.config)"
 
-      - name: Upload artifact (${{ matrix.target }})
+      - name: Build kernel (z3s)
+        run: |
+          ./build.sh -m z3s -k y -r n
+
+      - name: Upload artifact (z3s)
         uses: actions/upload-artifact@v4
         with:
-          name: kernel-${{ matrix.target }}
-          path: build/out/${{ matrix.target }}/*.zip
+          name: kernel-z3s-drivedroid
+          path: build/out/z3s/*.zip
