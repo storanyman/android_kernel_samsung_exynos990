@@ -37,9 +37,6 @@ jobs:
           sudo rm -rf /opt/ghc
           sudo apt clean
 
-      - name: Make build script executable
-        run: chmod +x build.sh
-
       - name: Verify z3s USB Mass Storage config
         run: |
           make O=out LLVM=1 LLVM_IAS=1 ARCH=arm64 exynos9830_defconfig z3s.config
@@ -48,12 +45,26 @@ jobs:
           grep -q '^CONFIG_USB_CONFIGFS_MASS_STORAGE=y$' out/.config
           grep -q '^CONFIG_USB_F_MASS_STORAGE=y$' out/.config
 
+      - name: Verify KernelSU is disabled
+        run: |
+          if grep -qE '^CONFIG_KSU=y$|^CONFIG_KSU_[A-Za-z0-9_]+=y$' out/.config; then
+            echo "ERROR: KernelSU is enabled in the final z3s config"
+            grep -E '^CONFIG_KSU' out/.config || true
+            exit 1
+          fi
+          echo "KernelSU: disabled in config"
+
       - name: Build kernel (${{ matrix.target }})
         run: |
-          ./build.sh -m ${{ matrix.target }} -k y -r n
+          ./build.sh -m ${{ matrix.target }} -k n -r n
+
+      - name: Verify built boot image exists
+        run: |
+          set -e
+          find build/out/${{ matrix.target }} -type f -name 'boot.img' -print -quit | grep -q .
 
       - name: Upload artifact (${{ matrix.target }})
         uses: actions/upload-artifact@v4
         with:
-          name: kernel-${{ matrix.target }}
+          name: kernel-${{ matrix.target }}-magisk
           path: build/out/${{ matrix.target }}/*.zip
